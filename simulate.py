@@ -5,9 +5,11 @@ import pylab as P
 def simulate(r,rr,rrrs,T,g,dt):
   pos=[]
   t=0
+  pos.append(r)
   while t<T:
-    r  = r  + rr*dt + 0.2*rrrs[int(t)]*dt*dt # 0.2 should should be 0.5 as 0.5*a*t^2
-    rr = rr + rrrs[int(t)]*dt + g*dt
+    ti = int(t)
+    r  = r  + rr*dt + 0.2*rrrs[ti]*dt*dt # 0.2 should should be 0.5 as 0.5*a*t^2
+    rr = rr + rrrs[ti]*dt + g*dt
     t  = t + dt
     pos.append(r)
   return pos
