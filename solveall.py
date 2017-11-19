@@ -11,20 +11,21 @@ dat=[]
 # MAIN PARAMETERS
 #######################################################
 N = 20
-r0  = np.array([-12,120])
-rr0 = np.array([0.0,0.0])
-rf  = np.array([0 ,0])
-g   = np.array([0 ,-0.6])
+# X=East, Y=Up, Z=North
+r0  = np.array([-15.,40.,0.])
+rr0 = np.array([6.,-4.0,4.0])
+rf  = np.array([0 ,0, 0])
+g   = np.array([0 ,-0.6, 0])
 max_thrust = 1.2
 
 # Returns array of accelerations
 min_fuel = 9999
 min_N    = None
-for N in range(5,60,2):
+for N in range(5,20,1):
   fuel, rrr = gfold.solve(r0,rr0,N,g,max_thrust=max_thrust)
-  if rrr:
-    positions = simulate.simulate(r0,rr0,rrr,N,g,dt=1)
-    simulate.plot(positions,rrr,title="T=%d, fuel=%.1f" % (N,fuel))
+#  if rrr:
+#    positions = simulate.simulate(r0,rr0,rrr,N,g,dt=1)
+#    simulate.plot(positions,rrr,title="T=%d, fuel=%.1f" % (N,fuel))
   if rrr and fuel < min_fuel:
     min_fuel = fuel
     min_N    = N
