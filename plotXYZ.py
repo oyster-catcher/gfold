@@ -123,13 +123,17 @@ except:
   dat_traj=[]
 
 dat_craft=read_data(fncraft)
-duration=dat_craft[-1]['time']
 xmin = min([d['x'] for d in dat_craft])
 xmax = max([d['x'] for d in dat_craft])
 ymin = min([d['y'] for d in dat_craft])
 ymax = max([d['y'] for d in dat_craft])
 zmin = min([d['z'] for d in dat_craft])
 zmax = max([d['z'] for d in dat_craft])
+tmax = max([d['time'] for d in dat_craft])
+if dat_traj:
+  tmax2 = max([d['time'] for d in dat_traj])
+  tmax = max(tmax,tmax2)
 size = max([-xmin,xmax,-ymin,ymax,-zmin,zmax])
 size = size*1.2
-plot(dat_craft,dat_traj,size=size,duration=duration)
+print tmax
+plot(dat_craft,dat_traj,size=size,duration=tmax)
