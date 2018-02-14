@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2.7
 
 import sys
 import math
@@ -254,22 +254,24 @@ def solve(r0,rr0,att0,T,N,g,max_thrust=1.0,min_thrust=0.1,maxT_angle=90,safe_ang
   # SOLVE!
   sol = solvers.socp(c, Gq=Gq, hq=hq, A=A, b=b)
   if sol['status']!='optimal':
-    return float("inf"),None,None,None
+    return float("inf"),None
 
-  rrrs = np.zeros( (N,3) )
-  thrusts = np.zeros(N)
+  accels = np.zeros( (N,3) )
   for i in range(0,N):
-    thrusts[i] = sol['x'][i]
-    rrrs[i,0] = sol['x'][N+i*3]
-    rrrs[i,1] = sol['x'][N+i*3+1]
-    rrrs[i,2] = sol['x'][N+i*3+2]
+    accels[i,0] = sol['x'][N+i*3]
+    accels[i,1] = sol['x'][N+i*3+1]
+    accels[i,2] = sol['x'][N+i*3+2]
 
-  # compute position predictions in inequality equation
-  positions = []
-  solx = np.array(sol['x'])
-  solx = solx[:,0]
-  for t,m,x_final in posm:
-    x = solx.dot(m) + x_final
-    positions.append( (t,x) )
+  return sol['primal objective'],accels
 
-  return sol['primal objective'],rrrs,thrusts,positions
+if __name__=='__main__':
+  # Test
+  r0 = np.array([20.,50.,0.])
+  v0 = np.array([0.,1.,0.])
+  g = np.array([-9.8,0.,0.])
+  att = np.array([1.,0.,0.])
+  for t in range(0,50,1):
+    T = float(t)
+    # def solve(r0,rr0,att0,T,N,g,max_thrust=1.0,min_thrust=0.1,maxT_angle=90,safe_angle=10,dt=0.1,maxLand_angle=10,min_height=20):
+    fuel, accels = solve(r,v,att,T,N,g,max_thrust=20.,min_thrust=0.5,maxT_angle=15,safe_angle=10,dt=0.1,maxLand_angle=5,min_height=0)
+    print T,fuel
