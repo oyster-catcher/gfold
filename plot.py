@@ -25,7 +25,7 @@ def plot(datas,title="",size=400,duration=30,names=[]):
     plot_line(ax,data,'time','x',color=colors[i])
   ax.grid()
   ax.legend(names)
-  P.subplot2grid((2,3),(0,1), colspan=1, rowspan=1)
+  P.subplot2grid((2,3),(1,0), colspan=1, rowspan=1)
   ax = P.gca()
   ax.set_xlabel("t")
   ax.set_ylabel("vx")
@@ -36,7 +36,7 @@ def plot(datas,title="",size=400,duration=30,names=[]):
   ax.grid()
   ax.legend(names)
 
-  P.subplot2grid((2,3),(1,0), colspan=1, rowspan=1)
+  P.subplot2grid((2,3),(0,1), colspan=1, rowspan=1)
   ax = P.gca()
   ax.set_xlabel("t")
   ax.set_ylabel("y")
