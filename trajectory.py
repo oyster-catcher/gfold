@@ -66,7 +66,7 @@ class Trajectory:
 
     return len(self.path)>0
 
-  def compute_soft_landing(self,space_center,vessel,tgt_lat,tgt_lng,tgt_alt,dt=1,compute_t=0.5,t0=0,logfile=None):
+  def compute_soft_landing(self,space_center,vessel,tgt_lat,tgt_lng,tgt_alt,dt=1,compute_t=0.5,t0=0,logfile=None,maxT_angle=90,maxLand_angle=15,min_throttle=0.05,max_throttle=0.9):
     """Compute trajectory for soft-landing phase"""
 
     r = np.array(vessel.position(vessel.orbit.body.reference_frame))
@@ -76,10 +76,6 @@ class Trajectory:
 
     # vars
     twr = vessel.max_thrust/vessel.mass
-    min_throttle = 0.01
-    max_throttle = 0.85
-    maxT_angle = 90
-    maxLand_angle = 5
     t_per_N = 5
     max_N = 8
     r2 = rotm.dot(r-rTgt)
@@ -97,7 +93,7 @@ class Trajectory:
       num_thrust = int(T/t_per_N)
       num_thrust = max(3,min(num_thrust,max_N))
       print "Evaluating f(T=%.3f)" % T,"num_thrust=",num_thrust
-      fuel, accels = gfold.solve(r2,v2,att,T=T,N=num_thrust,g=g,max_thrust=twr*max_throttle,min_thrust=twr*min_throttle,maxT_angle=maxT_angle,maxLand_angle=maxLand_angle,dt=T/100.0,min_height=10)
+      fuel, accels = gfold.solve(r2,v2,att,T=T,N=num_thrust,g=g,max_thrust=twr*max_throttle,min_thrust=twr*min_throttle,maxT_angle=maxT_angle,maxLand_angle=maxLand_angle,dt=T/100.0,min_height=40)
       if accels!=None:
         results[fuel] = (T,accels)
         print "Saving fuel=",fuel,"T=",T,"Accels=",len(accels)
@@ -119,7 +115,7 @@ class Trajectory:
       self.path = utils.compute_trajectory(r2,v2,accels,min_T,g,dt=dt,t0=t0+compute_t)
 
       # make sure trajectory ends at (0,0,0) - bit of a cheat
-      self.path = utils.correct_trajectory(self.path)
+      #self.path = utils.correct_trajectory(self.path)
 
       print "logfile",logfile
       if logfile:
