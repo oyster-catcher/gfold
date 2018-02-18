@@ -5,6 +5,7 @@ import math
 import numpy as np
 from math import sqrt
 from trajectory import Trajectory
+from pid import PID
 import utils
 
 ################################ FINAL LANDING #################################
@@ -33,7 +34,7 @@ class FinalLanding:
     throttle = err * self.throttle_Kp + self.surface_g/twr # last component to hover
     F  = -v
     vUp = r/np.linalg.norm(r)
-    return throttle,F + 0.5*vUp
+    return throttle,F + 2.5*vUp
 
   def draw(self,vessel):
     pass
@@ -41,19 +42,30 @@ class FinalLanding:
 ################################ SOFT LANDING #################################
 
 class SoftLanding:
-  def __init__(self,conn,vessel,tgt_lat,tgt_lng,tgt_height,pos_weight=0.2,vel_weight=0.4,t=0,logfile=None):
+  def __init__(self,conn,vessel,tgt_lat,tgt_lng,tgt_height,pos_P=0.15,vel_P=0.4,t=0,maxT_angle=90,maxLand_angle=15,min_throttle=0.05,max_throttle=0.9,steer_throttle=0.05,logfile=None):
     self.conn = conn
     surface_g = vessel.orbit.body.surface_gravity
-    self.pos_weight = pos_weight
-    self.vel_weight = vel_weight
+    self.steer_throttle = steer_throttle
     self.traj = Trajectory(surface_g=surface_g,body_radius=600000,mass=vessel.mass)
     # compute initial trajectory
-    self.traj.compute_soft_landing(self.conn.space_center,vessel,tgt_lat,tgt_lng,tgt_height,dt=0.5,t0=t,logfile=logfile)
+    self.traj.compute_soft_landing(self.conn.space_center,vessel,tgt_lat,tgt_lng,tgt_height,dt=0.5,t0=t,logfile=logfile,maxT_angle=maxT_angle,maxLand_angle=maxLand_angle,min_throttle=min_throttle,max_throttle=max_throttle)
     self.tgt_lat = tgt_lat
     self.tgt_lng = tgt_lng
     self.tgt_alt = tgt_height
+    d1=0.0
+    d2=0.0
+    i1=0.0
+    i2=0
+    self.PID_x = PID(P=pos_P*1.3,I=i1,D=d1) # give height extra weight
+    self.PID_y = PID(P=pos_P,I=i1,D=d1)
+    self.PID_z = PID(P=pos_P,I=i1,D=d1)
+    self.PID_vx = PID(P=vel_P,I=i2,D=d2)
+    self.PID_vy = PID(P=vel_P,I=i2,D=d2)
+    self.PID_vz = PID(P=vel_P,I=i2,D=d2)
+    self.fpid = file("pid.dat","w")
+    print >>self.fpid,"time\tx\ty\tz\tvx\tvy\tvz\tdx\tdy\tdz\tdvx\tdvy\tdvz\tpx\tpy\tpz\tpvx\tpvy\tpvz"
 
-  def compute_thrust(self,vessel):
+  def compute_thrust(self,vessel,t):
     """Follow the computed trajectory - if there is one"""
 
     # Set Force/direction based on closest trajectory point in speed/position
@@ -62,33 +74,62 @@ class SoftLanding:
     g = np.array([-vessel.orbit.body.surface_gravity,0.,0.]) # in local target ref frame
     twr = vessel.max_thrust / vessel.mass
 
-    # Convert to local co-ords for target
+    # Convert to local co-ords for target,rotm converting from rotating ref to local, with X=up
+    # r_Tgt is target position in rotating ref frame
     r_Tgt,rotm = utils.target_position_and_rotation(vessel,self.tgt_lat,self.tgt_lng,self.tgt_alt)
+    irotm = np.transpose(rotm)
 
-    dr, dv, F = self.traj.closest_to_trajectory(r,v,self.pos_weight,self.vel_weight)
+    # Gains of 1.0, 0.0 means find closest position only (ignore velocity)
+    dr, dv, F = self.traj.closest_to_trajectory(r,v,1.0,1.0)
 
     if dr==None:
       return 0,None # not on trajectory
 
-    # Difference to desired position and velocity gains
-    F = F + (dr-r)*self.pos_weight + (dv-v)*self.vel_weight
-    # convert F to local co-ords
-    irotm = np.transpose(rotm)
-    F = rotm.dot(F)
-    throttle = np.linalg.norm(F)/twr
-    F = np.array([F[0],F[1],F[2]])
+    F2 = rotm.dot(F)
 
-    if F[0] < 0.1:
-      throttle = 0.05
-      F = np.array([0.1,F[1],F[2]])
+    r2 = rotm.dot(r-r_Tgt)
+    v2 = rotm.dot(v)
+    dr2 = rotm.dot(dr-r_Tgt)
+    dv2 = rotm.dot(dv)
 
-    F = irotm.dot(F)
+    self.PID_x.setPoint(dr2[0])
+    self.PID_y.setPoint(dr2[1])
+    self.PID_z.setPoint(dr2[2])
+    self.PID_vx.setPoint(dv2[0])
+    self.PID_vy.setPoint(dv2[1])
+    self.PID_vz.setPoint(dv2[2])
+
+    # Update PID controllers
+    px = self.PID_x.update(r2[0])
+    py = self.PID_y.update(r2[1])
+    pz = self.PID_z.update(r2[2])
+    pvx = self.PID_vx.update(v2[0])
+    pvy = self.PID_vy.update(v2[1])
+    pvz = self.PID_vz.update(v2[2])
+
+    #print "px:",px,"py:",py,"pz:",pz
+    #print "pvx:",pvx,"pvy:",pvy,"pvz:",pvz
+  
+    print >>self.fpid,"%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f" % (t,r2[0],r2[1],r2[2],v2[0],v2[1],v2[2],dr2[0],dr2[1],dr2[2],dv2[0],dv2[1],dv2[2],px,py,pz,pvx,pvy,pvz)
+    self.fpid.flush()
+
+    # Correct force vector
+    F2 = F2 + np.array([px,py,pz]) + np.array([pvx,pvy,pvz])
+    #F2 = F2 + np.array([px,py,pz]) # aim only for position
+
+    # Don't thrust down
+    if F2[0] < 0.1:
+      throttle = self.steer_throttle
+      F2 = np.array([0.1,F2[1],F2[2]])
+    throttle = np.linalg.norm(F2)/twr
+
+    F = irotm.dot(F2)
 
     # Shut-off throttle if pointing away from desired direction
     att = np.array(vessel.flight(vessel.orbit.body.reference_frame).direction)
     ddot = np.dot(F/np.linalg.norm(F),att/np.linalg.norm(att))
-    if (ddot < math.cos(math.radians(80))):
-      throttle = 0.01 # enough to steer
+    if (ddot < math.cos(math.radians(70))):
+      throttle = self.steer_throttle # enough to steer
 
     return throttle,F
 
